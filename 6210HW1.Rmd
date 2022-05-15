@@ -1,0 +1,128 @@
+---
+title: "6210HW1"
+author: "Qinyuan Xing"
+date: "2021/9/12"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+###   Q1
+
+```{r Q1}
+cat("\n(a)\n")
+wage = data.frame(read.csv("Wage.csv"))
+ncol(wage)
+nrow(wage)
+cat("\nThere are",ncol(wage),"columns and",nrow(wage),"rows in the set\n")
+cat("\n(b)\n")
+summary(wage)
+str(wage)
+wage$maritl = as.factor(wage$maritl)
+wage$race = as.factor(wage$race)
+wage$education = as.factor(wage$education)
+wage$region = as.factor(wage$region)
+wage$jobclass = as.factor(wage$jobclass)
+wage$health = as.factor(wage$health)
+wage$health_ins = as.factor(wage$health_ins)
+str(wage)
+cat("\nAll the observations are from the same region Middle Atlantic. Maybe the set is just a part of the origin data set.\n")
+cat("\n(c)\n")
+hist(wage$wage,main = "Wage Distribution",xlab = "wage",seq(0,320,20))
+x = seq(min(wage$wage),max(wage$wage),by = 0.1)
+
+hist(wage$wage,main = "Wage Distribution",xlab = "wage",seq(0,320,20),freq = FALSE)
+lines(density(wage$wage),col="red" )
+lines(x,dnorm(x,mean(wage$wage),sd = sd(wage$wage)),lty = 2,col = "blue")
+legend("topright",c("Normal","Estimate Density"),col = c("blue","red"),lty =c(2,1) )
+cat("\nSo the distribution of the wage seems like Normal Distribution but not so accurate.\n")
+cat("\n(d)\n")
+pairs(wage[,c('year','age','logwage','wage')],panel=panel.smooth)
+cor(wage[,c('year','age','logwage','wage')])
+cat("\nAccording to the results, mostly, the people who earn the high wages are middle aged from 30-60.\n")
+cat("\n(e)\n")
+boxplot(wage~maritl, wage,par(las=2))
+boxplot(wage~race, wage,par(las=2))
+boxplot(wage~education, wage,par(las=2))
+boxplot(wage~region, wage,par(las=2))
+boxplot(wage~jobclass, wage,par(las=2))
+boxplot(wage~health, wage,par(las=2))
+boxplot(wage~health_ins, wage,par(las=2))
+cat("\nAccording to the plots, we can know that married people have more wages in general.\nPeople's wages has positive relationships with education level.\nPeople who engaged in information have more wages.\nPeople who has more wages are healthier in general and they are more likely to buy insurance.\n")
+cat("\n(f)\n")
+qqnorm(wage$wage,main = "QQplot of wage",col = "blue")
+qqline(wage$wage,col = "blue")
+cat("\nAccording to the Q-Q plot we know that the wage data do not follow the normal distribution\n")
+sum(is.na(wage))
+cat("\nAccording to the 'is.na' function we know that there is no missing value in the data set.\n")
+cat("\n(g)\n")
+cat("\nThe most related variable I think is the education.\nBecause the boxplot shows a strong and clear positive relation between wage and education levels.\n")
+```
+
+###   Q2
+
+```{r Q2}
+X = as.matrix(cbind(1,wage$year,wage$age))
+y = matrix(wage$wage,ncol = 1)
+beta_hat = solve(t(X) %*% X) %*% t(X) %*% y
+beta_hat = data.frame(beta_hat)
+row.names(beta_hat) = c("intercept","year","age")
+beta_hat
+
+```
+
+###   Q3
+
+```{r Q3}
+set.seed(111)
+cat("\n(a)\n")
+s = wage[sample(nrow(wage),size = nrow(wage),replace = TRUE),]
+summary(s)
+summary(wage)
+cat("\nThese two summary shows that the two data set are similar but have small differences in the distributions of the variables.\n")
+cat("\n(b)\n")
+X = as.matrix(cbind(1,s$year,s$age))
+y = matrix(s$wage,ncol = 1)
+beta_hat = solve(t(X) %*% X) %*% t(X) %*% y
+beta_hat = data.frame(beta_hat)
+row.names(beta_hat) = c("intercept","year","age")
+beta_hat
+cat("\nThe estamate coefficient of age is",beta_hat[3,],"\n")
+cat("\n(c)\n")
+b_age = NULL
+for (i in 1:1000) 
+  {
+   s = wage[sample(nrow(wage),size = nrow(wage),replace = TRUE),]
+   X = as.matrix(cbind(1,s$year,s$age))
+   y = matrix(s$wage,ncol = 1)
+   beta_hat = solve(t(X) %*% X) %*% t(X) %*% y
+   b_age[i] = beta_hat[3]
+} 
+summary(b_age)
+cat("\nThe mean of the bootstrap estimates is nearly same with the origin estimate.\n")
+cat("\n(d)\n")
+hist(b_age,main = "Beta of age Distribution",xlab = "beta",freq = FALSE)
+lines(density(b_age),col="red" )
+cat("\nThe plot is almost the normal distribution.\n")
+cat("\n(e)\n")
+var_beta = var(b_age)
+se_beta = sqrt(var_beta)
+cat("\n The bootstrap estimate of the standard error for beta =",se_beta," \n")
+cat("\n(f)\n")
+quantile(b_age,c(0.025,0.975))
+```
+
+
+

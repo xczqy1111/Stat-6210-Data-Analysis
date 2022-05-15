@@ -1,0 +1,119 @@
+---
+title: "6210HW2"
+author: "Qinyuan Xing"
+date: "2021/9/24"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+###   Q1
+
+```{r Q1}
+cat("\n(a)\n")
+Wage = data.frame(read.csv("Wage.csv"))
+X = as.matrix(cbind(1,Wage$year,Wage$age))
+y = matrix(Wage$wage,ncol = 1)
+beta_hat = solve(t(X) %*% X) %*% t(X) %*% y
+beta_hat = as.vector(beta_hat)
+par = NULL
+max_lklh = function(par){
+              with(Wage,-sum(-(1/2)*log(2*pi)-(1/2)*log(1669.5)-(1/(2*1669.5))*(wage-par[1]-par[2]*year-par[3]*age)^2))
+}
+result = optim(par = beta_hat ,max_lklh)
+result
+cat("\n(b)\n")
+cat("According to the result of (a), we found that the parameters of the optim relults are the same with our results in HW1Q2. Maybe it is because the results are from the closed form solution.")
+```
+
+###   Q2
+
+```{r}
+covid = data.frame(read.csv("covid_data_pdb.csv"))
+cat("\n(a)\n")
+cat("(1).The relation between the covid case rate and the urbanized rate.\n(2).The relation between the covid case rate and the age distribution.\n(3).The relation between the covid case rate with the health insurance rate.")
+cat("\n(b)\n")
+cat("H0: The covid case rate in the division'pacific' = 0.3. H1:otherwise")
+cat("\n(c)\n")
+cat("Inference,beacuse the variable of interest covid case rate is easy to be obtained and we want to know the association between it and other variables.")
+cat("\n(d)\n")
+str(covid)
+covid$StateAbbr = as.factor(covid$StateAbbr)
+covid$State = as.factor(covid$State)
+covid$State_name = as.factor(covid$State_name)
+covid$division = as.factor(covid$division)
+covid$County = as.character(covid$County)
+summary(covid)
+cat("\n(e)\n")
+covid$covid_case_rate = 100*covid$covid_count/covid$Tot_Population_ACS_14_18
+
+hist(covid$covid_case_rate,main = "covid case rate",xlab = "rate%",seq(0,70,2),freq = FALSE)
+lines(density(covid$covid_case_rate),col="red" )
+cat("\nAccording to the plot, nearly all counties in America have the covid case rate between 0%-25% but there is still a outlier which is 68.31% in the AK.But this is because the county is so small and population is few.\n")
+cat("\n(f)\n")
+covid_simple = covid[,c(10,159,163,167,169,171,173,175,177,179,182,186,196,197,211,212,214,217,219,228,230,232,260,265,269,271,274,282,285,287,290)]
+cor(covid_simple)
+cat("\nAccording to the correlation, the covid case rate are most likely associated with the education level, the house or wealth.\n")
+cat("\n(g)\n")
+boxplot(covid_case_rate~division, covid,par(las=2),main="divison and covid rate")
+cat("\nAccording to the boxplot, we found that different divisions have similar covid case rate but the Newengland area has the lowest rate.\n")
+cat("\n(h)\n")
+qqnorm(covid$covid_case_rate,main = "QQplot of covid case rate",col = "red")
+qqline(covid$covid_case_rate,col = "red")
+cat("\nFrom the Q-Q plot we known that the covid case rates do not follow normal distribution.\n")
+plot(covid$division,xlab = "Division", ylab="Frequency",las=2,main = "Division barplot",col="red")
+cat("\nFrom the barplot we can find the samples' geographic distribution\n")
+cat("\n(i)\n")
+cat("\nFrom the correlation and boxplot above,I think the education level and the average house value and other similar variables about income  are strongly related to the covid case rate. Because these correlations have high absolute values.\nActually, we can understand it by common sense, for the couties with high average house value and education level, people are mostly have good living condition so that the covid rate is lower.\n")
+```
+
+###   Q3
+```{r Q3}
+cat("\n(a)\n")
+lmod1 = lm(wage~year+age,Wage)
+sum = summary(lmod1)
+sum$coefficients
+cat("\nAccording to the results, the three results are almost the same because we use the same closed form solution of beta for the MLE to get the estimates.\n")
+cat("\n(b)\n")
+cat("\nEvery time age increases by 1, the wage will be estimated to increase by 0.699 which equal to the coefficient of age.\n")
+cat("\n(c)\n")
+sum
+R1 = Wage$wage - fitted(lmod1)
+R2 = residuals(lmod1)
+R3 = lmod1$residuals
+R2==R3
+R1==R2
+cat("\n The calculated residuals are not showed equal maybe because of the calculation accuracy,but they are actually the same if we ignore the calculation error\n")
+cat("\n(d)\n")
+AIC1 = -2*logLik(lmod1)+2*(3+1)
+AIC1
+AIC2 = AIC(lmod1)
+AIC2
+AIC1==AIC2
+cat("\nThe two AICs of the model are the same\n")
+cat("\n(e)\n")
+MSE1 = sum(residuals(lmod1)^2)/lmod1$df.residual
+MSE1
+MSE2 = sum$sigma^2
+MSE2
+MSE1 == MSE2
+cat("\nThe two MSEs of the model are the same but the result is limitedd by the calculation accuracy.\n")
+cat("\n(f)\n")
+AIC(lm(wage~1,Wage),lm(wage~year,Wage),lm(wage~age,Wage),lmod1)
+cat("\nAccording to the results above, when we select the features forward, one variable should choose 'age', but the model with two variables is still the best.\n")
+```
+
+
+

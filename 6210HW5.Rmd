@@ -1,0 +1,248 @@
+---
+title: "6210HW5"
+author: "Qinyuan Xing"
+date: "2021/11/8"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+###   Q1
+
+```{r}
+covid = data.frame(read.csv("covid_data_pdb_2.csv"))
+covid$StateAbbr = as.factor(covid$StateAbbr)
+covid$State = as.factor(covid$State)
+covid$State_name = as.factor(covid$State_name)
+covid$division = as.factor(covid$division)
+covid$County = as.character(covid$County)
+covid$TransHigh = as.factor(100000*(covid$covid_count_sep17-covid$covid_count_sep10)/covid$Tot_Population_ACS_14_18>=100)
+covid$PovHigh = as.factor((covid$pct_Prs_Blw_Pov_Lev_ACS_14_18>20))
+```
+
+```{r}
+cat("\n(a)\n")
+t1 = xtabs(~PovHigh+TransHigh,data=covid)
+rownames(t1) = c("No","Yes")
+colnames(t1) = c("No","Yes")
+t1
+cat("\nThe joint and marginal probabilities:\n")
+addmargins(prop.table(t1))
+```
+```{r}
+cat("\n(b)\n")
+mt1=prop.table(t1,margin = 1)
+mt1
+cat("\nThe conditional probabilities of High transmission given High or NOT Poverty=0.9712 or 0.9288,\n")
+```
+```{r}
+cat("\n(c)\n")
+diff = mt1[2,2]-mt1[1,2]
+diff
+cat("\nThe difference is because for the county with high poverty rate, the living and medical condition are worse than other counties.\n")
+se_diff = sqrt(mt1[2,2]*(1-mt1[2,2])/sum(t1[2,]) + mt1[1,2]*(1-mt1[1,2])/sum(t1[1,]))
+l = diff - qnorm(1-(.05/2))*se_diff
+u = diff + qnorm(1-(.05/2))*se_diff
+cat("\nThe 95% Wald CI is:\n")
+c(l,u)
+```
+```{r}
+cat("\n(d)\n")
+r = mt1[2,2]/mt1[1,2]
+r
+cat("\nThe relative risk is",r,"which means a county with High poverty rate has 1.05 times probability to be High transmission county compared with others.\n")
+logr = log(r)
+logr
+se_logr = sqrt((1-mt1[2,2])/t1[2,2] + (1-mt1[1,2])/t1[1,2])
+se_logr
+lr = logr - qnorm(1-(.05/2))*se_logr
+ur = logr + qnorm(1-(.05/2))*se_logr
+c(lr,ur)
+explr = exp(lr)
+expur = exp(ur)
+cat("\nThe 95% Wald CI of RR is:\n")
+c(explr,expur)
+
+```
+```{r}
+cat("\n(e)\n")
+OR = (t1[1,1]*t1[2,2]) / (t1[1,2]*t1[2,1])
+OR
+cat("\nThe Odd Ratio is",OR,"which means the county with High poverty rate has 2.58 times odds compared with No high poverty.\n")
+logOR = log(OR)
+logOR
+se_logOR = sqrt(sum(1/t1))
+se_logOR
+lo = logOR - qnorm(1-(.05/2))*se_logOR
+uo = logOR + qnorm(1-(.05/2))*se_logOR
+c(lo,uo)
+explo = exp(lo)
+expuo = exp(uo)
+cat("\nThe 95% Wald CI of ORis:\n")
+c(explo,expuo)
+```
+```{r}
+cat("\n(f)\n")
+cat("\nThere is an association between High poverty and High Covid because the diffrence of propotions is not 0, the relative risk is not 1 and the odd ratio is not 1.\n")
+```
+```{r}
+cat("\n(g)\n")
+x = matrix(c(124,4,11,3,40,12,2297,640), nrow=2)
+rownames(x) = c("Not High Poverty","High Poverty")
+colnames(x) = c("Low","Moderate","Substantial","High")
+x
+pi_hat = x/sum(x)
+cat("\nThe joint and marginal probabilities:\n")
+addmargins(prop.table(x))
+```
+```{r}
+cat("\n(h)\n")
+x_marg = apply(x,1,sum)
+y_marg = apply(x,2,sum)
+mu_hat = (x_marg %*% t(y_marg)) / sum(x)
+mu_hat
+```
+```{r}
+cat("\n(i)\n")
+X2 = sum((x-mu_hat)^2/mu_hat)
+X2
+qchisq(.95,(dim(x)[1]-1)*(dim(x)[2]-1))
+1-pchisq(X2,(dim(x)[1]-1)*(dim(x)[2]-1))
+cat("\n25.8>7.81 so we reject the H0:High poverty and Covid Transmission are independent. p-value is 1.03e-05.\n")
+chisq.test(x)
+cat("\nThe result above proved our calculations.\n")
+```
+```{r}
+cat("\n(j)\n")
+G2 = 2*(sum(x*log(x/mu_hat)))
+G2
+1-pchisq(G2,(dim(x)[1]-1)*(dim(x)[2]-1))
+cat("\n36.6>7.81 so we reject the H0:High poverty and Covid Transmission are independent. p-value is 5.67e-08.\n")
+library(DescTools)
+GTest(x)
+cat("\nThe result above proved our calculations.\n")
+```
+```{r}
+cat("\n(k)\n")
+cat("The standardized Pearson residuals are:\n")
+chisq.test(x)$stdres
+cat("\nThe results show that Low and High Covid transmission have association with Poverty rate.\n")
+```
+```{r}
+cat("\n(l)\n")
+x
+qchisq(.95,1)
+qchisq(.95,2)
+GTest(matrix(c(11,3,40,12,2297,640),nrow=2))
+cat("\nWe cannot reject the independence between High Poverty and modest or substantial or High transmission.\n")
+GTest(matrix(c(124,4,51,15),nrow=2))
+cat("\nWe can find the difference between Low and modest/substantial transmission in terms of the poverty rate.\n")
+GTest(matrix(c(51,15,2297,640),nrow=2))
+cat("\nWe cannot find the difference between High and modest/substantial transmission in terms of the poverty rate.\n")
+GTest(matrix(c(124,4,2348,655),nrow=2))
+cat("\nWe can find the difference between Low and modest/substantial/High transmission in terms of the poverty rate.\n")
+cat("\nFinally we find that Low tansmission rate has association with Poverty rate.\n")
+```
+
+###   Q2
+
+```{r}
+cat("\n(a)\n")
+covid2 = data.frame(read.csv("three_way_COVID_table.csv"))
+t2 = xtabs(count~region+covid_rate_high+vacc_rate_high,data=covid2)
+x_midwest = xtabs(count~vacc_rate_high+covid_rate_high,data=covid2,subset = region=="Midwest")
+cat("\nMidwest:\n")
+x_midwest
+OddsRatio(x_midwest)
+x_northeast = xtabs(count~vacc_rate_high+covid_rate_high,data=covid2,subset = region=="Northeast")
+cat("\nNortheast:\n")
+x_northeast
+OddsRatio(x_northeast)
+x_south = xtabs(count~vacc_rate_high+covid_rate_high,data=covid2,subset = region=="South")
+cat("\nSouth:\n")
+x_south
+OddsRatio(x_south)
+x_west = xtabs(count~vacc_rate_high+covid_rate_high,data=covid2,subset = region=="West")
+cat("\nWest:\n")
+x_west
+OddsRatio(x_west)
+cat("\nThe results show that there is an association between
+vaccination and COVID transmission level for each of the regions because the OR is not 1.\n")
+cat("\nThe OR in Midwest shows that the odds of low covid rate for low vaccine rate is 4.87 times the odds for high vaccine rate.It maybe because there is little county with high vaccine rate in that region\n")
+cat("\nThe OR in West shows that the odds of low covid rate for low vaccine rate is 0.436 times the odds for high vaccine rate. This is normal because the higher vaccine rate, the lower covid rate.\n")
+```
+```{r}
+cat("\n(b)\n")
+model = glm(count~covid_rate_high*vacc_rate_high*region,data=covid2, family=poisson())
+summary(model)
+resids = residuals(model,type="pearson")
+resids
+cat("\nThe residual deviance and pearson residuals are zero because the model fits well.\n")
+```
+```{r}
+cat("\n(c)\n")
+model1 = glm(count~covid_rate_high*vacc_rate_high+region,data=covid2, family=poisson())
+summary(model1)
+qchisq(.95,model1$df.residual)
+1-pchisq(model1$deviance,model$df.residual)
+cat("\n562.78>16.9 so we reject H0: The new model is better,p-value =0\n")
+```
+```{r}
+cat("\n(d)\n")
+cat("\nCovid rate Not High, vaccine rate Not High, Midwest are my reference group.\n")
+cat("\nThe coefficient for the interaction covid_rate_highTRUE:vacc_rate_highTRUE is 0.2016. Thus the estimated odds ratio for the effect in Midwest (the
+reference group) is exp(0.2016) = 1.22.\n")
+```
+```{r}
+cat("\n(e)\n")
+model2=glm(count~covid_rate_high+vacc_rate_high+region+covid_rate_high:vacc_rate_high:region,data=covid2, family=poisson())
+summary(model2)
+model3 = glm(count~covid_rate_high+vacc_rate_high+region,data=covid2, family=poisson())
+summary(model3)
+qchisq(.95,model3$df.residual)
+1-pchisq(model3$deviance,model2$df.residual)
+anova(model3,model2,test = "Chisq")
+cat("\n563.73>18.3 so we reject the H0: model without three-way interaction is better. So the association between vaccination rate and COVID transmission level differ by
+region\n")
+```
+```{r}
+cat("\n(f)\n")
+
+```
+```{r}
+cat("\n(g)\n")
+cat("The model with only 1 three-way interaction is better. conditional independence")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

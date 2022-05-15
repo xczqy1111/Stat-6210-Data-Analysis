@@ -1,0 +1,209 @@
+---
+title: "6210HW4"
+author: "Qinyuan Xing"
+date: "2021/10/25"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+###   Q1
+
+```{r}
+cat("\n(a)\n")
+covid = data.frame(read.csv("covid_data_pdb_2.csv"))
+covid$StateAbbr = as.factor(covid$StateAbbr)
+covid$State = as.factor(covid$State)
+covid$State_name = as.factor(covid$State_name)
+covid$division = as.factor(covid$division)
+covid$County = as.character(covid$County)
+covid$y = as.factor(100000*(covid$covid_count_sep17-covid$covid_count_sep10)/covid$Tot_Population_ACS_14_18<10)
+covid_simple = covid[,c(4,10,159,163,167,169,171,173,175,177,179,182,186,196,197,211,212,214,217,219,228,230,232,260,265,269,271,274,282,285,287,289,290)+2]
+summary(covid_simple)
+
+summary(glm(y~.,family = "binomial",covid_simple))
+cat("\nFrom the summary above, we can see the association between y and each predictor.\n")
+cat("\n(b)\n")
+logit = glm(y ~., family = binomial(link=logit),covid_simple)
+summary(logit)
+anova(glm(y~1,family = "binomial",covid_simple),logit,test = "Chisq")
+logit$null.deviance- logit$deviance
+qchisq(.05,39,lower.tail=FALSE)
+cat("\nH0 : intercept only model\nHa : proposed model\np<0.05\n392 is bigger than x-squared so we reject the H0.\n")
+cat("\n(c)\n")
+logit2=step(logit,direction = "both")
+car::vif(logit2)
+logit2=glm(y ~ POPESTIMATE2020 + pct_URBANIZED_AREA_POP_CEN_2010 + pct_Pop_under_5_ACS_14_18+
+    pct_Pop_65plus_ACS_14_18 + 
+    pct_Hispanic_ACS_14_18 + pct_Not_HS_Grad_ACS_14_18 + 
+    pct_College_ACS_14_18 + pct_Prs_Blw_Pov_Lev_ACS_14_18 + pct_No_Health_Ins_ACS_14_18 + 
+    pct_Vacant_Units_ACS_14_18 + 
+    pct_Renter_Occp_HU_ACS_14_18 + pct_Single_Unit_ACS_14_18 + 
+    division,family = binomial(link=logit),covid_simple,maxit=100)
+summary(logit2)
+anova(logit2,logit,test = "Chisq")
+logit2$deviance-logit$deviance
+qchisq(.05,19,lower.tail=FALSE)
+cat("\nFrom the results, we cannot reject H0:new reduced model. So the new model is better.\n")
+cat("\n(d)\n")
+logit3 = glm(y ~ (POPESTIMATE2020 + pct_URBANIZED_AREA_POP_CEN_2010 + pct_Pop_under_5_ACS_14_18+
+    pct_Pop_65plus_ACS_14_18 + 
+    pct_Hispanic_ACS_14_18 + pct_Not_HS_Grad_ACS_14_18 + 
+    pct_College_ACS_14_18 + pct_Prs_Blw_Pov_Lev_ACS_14_18 + pct_No_Health_Ins_ACS_14_18 + 
+    pct_Vacant_Units_ACS_14_18 + 
+    pct_Renter_Occp_HU_ACS_14_18 + pct_Single_Unit_ACS_14_18 + 
+    division)^2,family = binomial(link=logit),covid_simple,maxit=100)
+logit4 = step(logit3,direction = 'backward')
+anova(logit2,logit4,test = "Chisq")
+qchisq(0.05,39,lower.tail = F)
+cat("The new model with interactions is better")
+cat("\n(e)\n")
+plot(logit4,5)
+cat("the 1847th point is influential")
+cat("\n(f)\n")
+summary(logit4)
+lb = logit4$coefficients[8] - qnorm(.05/2,lower.tail=FALSE) * summary(logit4)$coefficients[8,2]
+ub = logit4$coefficients[8] + qnorm(.05/2,lower.tail=FALSE) * summary(logit4)$coefficients[8,2]
+c(lb,ub)
+cat("\n(g)\n")
+covid_simple$yhat =as.factor(logit4$fitted.values>0.5)
+table(covid_simple$y,covid_simple$yhat)
+cat("\n114 obsevations have wrong predictions.\n")
+covid_simple$yhat2 =as.factor((logit4$fitted.values>(sum(covid_simple$y==T)/nrow(covid_simple))))
+table(covid_simple$y,covid_simple$yhat2)
+cat("\n459 obsevations have wrong predictions.\n")
+114/3132
+458/3132
+cat("\nI will choose the first cutoff because the proportion of incorrection is smaller.\n")
+cat("yhat1 FPR=",14/3004,"FNR=",100/128)
+cat("yhat2 FPR=",451/3004,"FNR=",8/128)
+cat("\nI will choose the yhat2 for both FNR and FPR are smaller than 20%.\n")
+covid_simple$prob = logit4$fitted.values
+library(pROC)
+h = roc(y~prob,covid_simple)
+plot(h)
+h$auc
+cat("\nThe auc and roc show the model is good.\n")
+
+
+```
+
+###   Q2
+```{r}
+cat("\n(a)\n")
+covid2 = data.frame(read.csv("covid_data_pdb_2.csv"))
+covid2$StateAbbr = as.factor(covid$StateAbbr)
+covid2$State = as.factor(covid$State)
+covid2$State_name = as.factor(covid$State_name)
+covid2$division = as.factor(covid$division)
+covid2$County = as.character(covid$County)
+covid2$y[(100000*(covid$covid_count_sep17-covid$covid_count_sep10)/covid$Tot_Population_ACS_14_18<10)]="Low"
+covid2$y[(100000*(covid$covid_count_sep17-covid$covid_count_sep10)/covid$Tot_Population_ACS_14_18<50&100000*(covid$covid_count_sep17-covid$covid_count_sep10)/covid$Tot_Population_ACS_14_18>=10)]="moderate"
+covid2$y[(100000*(covid$covid_count_sep17-covid$covid_count_sep10)/covid$Tot_Population_ACS_14_18<100&100000*(covid$covid_count_sep17-covid$covid_count_sep10)/covid$Tot_Population_ACS_14_18>=50)]="substantial"
+covid2$y[(100000*(covid$covid_count_sep17-covid$covid_count_sep10)/covid$Tot_Population_ACS_14_18>=100)]="High"
+covid2_simple = covid2[,c(4,10,159,163,167,169,171,173,175,177,179,182,186,196,197,211,212,214,217,219,228,230,232,260,265,269,271,274,282,285,287,289,290)+2]
+covid2_simple$y= as.factor(covid2_simple$y)
+summary(covid2_simple)
+cat("\n(b)\n")
+library(VGAM)
+covid2_simple$y2=relevel(factor(covid2_simple$y),ref = "High" )
+cat("Choose 'High' as baseline for 'High' is the most.")
+mlogit = vglm(y2~pct_URBANIZED_AREA_POP_CEN_2010 + 
+    pct_Pop_under_5_ACS_14_18+
+    pct_Pop_65plus_ACS_14_18 + 
+    pct_Hispanic_ACS_14_18 + pct_Not_HS_Grad_ACS_14_18 + 
+    pct_College_ACS_14_18 + pct_Prs_Blw_Pov_Lev_ACS_14_18 + pct_No_Health_Ins_ACS_14_18 + 
+    pct_Vacant_Units_ACS_14_18 + 
+    pct_Renter_Occp_HU_ACS_14_18 + pct_Single_Unit_ACS_14_18 + 
+    division,family = "multinomial",covid2_simple)
+summary(mlogit)
+cat("\n(c)\n")
+mlogit0 = vglm(y~1,family = "multinomial",covid2_simple)
+summary(mlogit0)
+deviance(mlogit0)-deviance(mlogit)
+qchisq(0.05,9393-9336,lower.tail = F)
+1-pchisq(deviance(mlogit0)-deviance(mlogit),9342-9336)
+cat("\nWe can reject H0:The null model and we choose the new model.\n")
+cat("\n(d)\n")
+mlogit2 = step4vglm(mlogit)
+summary(mlogit2)
+deviance(mlogit2)-deviance(mlogit)
+qchisq(0.05,9342-9336,lower.tail = F)
+1-pchisq(deviance(mlogit2)-deviance(mlogit),9342-9336)
+cat("\nWe cannot reject H0:The new reduced model because 8.092<12.592.\n")
+cat("\n(e)\n")
+anova(mlogit2)
+summary(mlogit2)
+cat("\nI choose 'pct_Pop_under_5_ACS_14_18' As the predictor.The coef of it for category 'Low' is 0.445 which means when the predictor increases 1, the probablility of the y='Low' will increase by multiply exp(0.445).\n")
+cat("\n(f)\n")
+result = data.frame(fitted.values(mlogit2))
+result$yp = apply(result,MARGIN = 1,FUN = max)
+result$yhat[result$yp==result$High] = "High"
+result$yhat[result$yp==result$Low] = "Low"
+result$yhat[result$yp==result$moderate] = "moderate"
+result$yhat[result$yp==result$substantial] = "substantial"
+result$yhat = as.factor(result$yhat)
+head(result)
+table(result$yhat,covid2_simple$y2)
+frate = 1- (2933+10)/3132
+frate
+cat("\nThe incorrection rate is 0.0603=6.03%\n")
+cat("\n(g)\n")
+library(caret)
+confusionMatrix(result$yhat,covid2_simple$y2,mode = "everything")
+cat("\nFor High,FPR=\n")
+(118+14+51)/(118+10+14+1+51+1)
+cat("\nFNR=\n")
+(3+1)/(2933+1+3)
+cat("\nFor Low,FPR=\n")
+(3+1)/(2933+3+1+14+1+51+1)
+cat("\nFNR=\n")
+118/(118+10)
+cat("\nFor moderate,FPR=\n")
+0
+cat("\nFNR=\n")
+1
+cat("\nFor substantial,FPR=\n")
+(1+1)/(2933+1+3+118+10+14+1)
+cat("\nFNR=\n")
+1
+cat("\nThe most interesting thing is for FPR,all the other levels are so small except High level. Oppositely, for FNR, all the other levels are so big except High level.\n")
+cat("\n(h)\n")
+clogit = vglm(formula = y2 ~ pct_Pop_under_5_ACS_14_18 + pct_Pop_65plus_ACS_14_18 + 
+    pct_Not_HS_Grad_ACS_14_18 + pct_College_ACS_14_18 + pct_Prs_Blw_Pov_Lev_ACS_14_18 + 
+    pct_No_Health_Ins_ACS_14_18 + pct_Vacant_Units_ACS_14_18 + 
+    pct_Renter_Occp_HU_ACS_14_18 + pct_Single_Unit_ACS_14_18 + 
+    division, family = cumulative(parallel = FALSE) , data = covid2_simple)
+summary(clogit)
+cat("\n(i)\n")
+cresult = data.frame(fitted.values(clogit))
+cresult$yp = apply(cresult,MARGIN = 1,FUN = max)
+cresult$yhat[cresult$yp==cresult$High] = "High"
+cresult$yhat[cresult$yp==cresult$Low] = "Low"
+cresult$yhat[cresult$yp==cresult$moderate] = "moderate"
+cresult$yhat[cresult$yp==cresult$substantial] = "substantial"
+cresult$yhat = as.factor(cresult$yhat)
+head(cresult)
+table(cresult$yhat,covid2_simple$y2)
+1-(2884+28+4)/3132
+cat("\nThe incorrection rate=6.897%\n")
+cat("\n(j)\n")
+cat("\nFor BCL model\n")
+confusionMatrix(result$yhat,covid2_simple$y2,mode = "everything")
+cat("\nFor cumulative logit model\n")
+confusionMatrix(cresult$yhat,covid2_simple$y2,mode = "everything")
+cat("\nAccording to the measures above, I will choose the cumulative logit model because it has lower FNR and FPR with pretty high accuracy.\n")
+```
+

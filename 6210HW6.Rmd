@@ -1,0 +1,361 @@
+---
+title: "6210HW6"
+author: "Qinyuan Xing"
+date: "2021/11/19"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  pdf_document:
+    
+    toc: yes
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+# Q1
+
+```{r}
+covid = data.frame(read.csv("covid_data_pdb_2.csv"))
+covid$StateAbbr = as.factor(covid$StateAbbr)
+covid$State = as.factor(covid$State)
+covid$State_name = as.factor(covid$State_name)
+covid$division = as.factor(covid$division)
+covid$County = as.factor(covid$County)
+
+covid$y = covid$covid_count_sep17-covid$covid_count_sep10
+covid[covid$y<0,]$y = 0
+```
+## (a)
+
+```{r}
+summary(covid$y)
+cat("\nThe mean:\n")
+mean(covid$y)
+cat("\nThe variance:\n")
+var(covid$y)
+```
+
+The variance >> the mean, so we find overdispersion obviously.
+
+## (b)
+
+```{r}
+covid_simple = covid[,c("y","LAND_AREA","pct_URBANIZED_AREA_POP_CEN_2010","pct_Males_ACS_14_18", "pct_Pop_5_17_ACS_14_18",
+                           "pct_Pop_18_24_ACS_14_18","pct_Pop_25_44_ACS_14_18","pct_Pop_45_64_ACS_14_18", "pct_Pop_65plus_ACS_14_18","pct_Inst_GQ_CEN_2010",
+                           "pct_Hispanic_ACS_14_18","pct_NH_Blk_alone_ACS_14_18","pct_Prs_Blw_Pov_Lev_ACS_14_18",                       "pct_Not_HS_Grad_ACS_14_18","pct_College_ACS_14_18","pct_No_Health_Ins_ACS_14_18","pct_Civ_unemp_16p_ACS_14_18","pct_Diff_HU_1yr_Ago_ACS_14_18",    "pct_NON_US_Cit_ACS_14_18","avg_Tot_Prns_in_HHD_ACS_14_18","avg_Agg_HH_INC_ACS_14_18","pct_Vacant_Units_ACS_14_18",                           "pct_Renter_Occp_HU_ACS_14_18","avg_Agg_House_Value_ACS_14_18","pct_HHD_No_Internet_ACS_14_18", "pct_Single_Unit_ACS_14_18","division")]
+
+pomodel1 = glm(y~.,data = covid_simple,family = poisson())
+summary(pomodel1)
+cat("\n We compare the saturated model with the fitted model\n")
+cat("\nThe chi-squared statistic value:\n")
+qchisq(.95,3098)
+cat("\nThe p-value:\n")
+1-pchisq(pomodel1$deviance,3098)
+cat("\nWe can reject H0 the fitted model.\n")
+cat("\nThe difference between the Residual Deviance and Null Deviance:\n")
+pomodel1$null.deviance-pomodel1$deviance
+cat("\nThe chi-squared statistic value:\n")
+qchisq(.95,3131-3098)
+cat("\nThe p-value:\n")
+1-pchisq(pomodel1$null.deviance-pomodel1$deviance,33)
+```
+According to the results we find that the residual deviance and the difference between null and redeced model's deviance are very large which means lack of fit.
+
+We can reject H0 the null model and choose H1 the reduced model because 1502921 >> 47.4
+
+## (c)
+
+```{r}
+cat("\nThe exp(beta of percent poverty):\n")
+exp(pomodel1$coefficients[13])
+cat("\nIt means a one-unit increase in the predictor has a multiplicative impact of 1.01 on μ:\n")
+cat("\nThe Wald statistics:\n")
+pomodel1$coefficients[13]/summary(pomodel1)$coefficients[13,2]
+cat("\nThe z-score for 95% confience level:\n")
+qnorm(.05/2,lower.tail=FALSE)
+cat("\n 30.1>1.96 so the beta is statistically significant at 95% confidence level\n")
+cat("\nWe can also use the 95% CI which doesn't include 0 to show it:\n")
+lb = pomodel1$coefficients[13] - qnorm(.05/2,lower.tail=FALSE) * summary(pomodel1)$coefficients[13,2]
+ub = pomodel1$coefficients[13] + qnorm(.05/2,lower.tail=FALSE) * summary(pomodel1)$coefficients[13,2]
+c(lb,ub)
+```
+
+## (d)
+
+```{r}
+pomodel2 = glm(y~.,data = covid_simple,family = poisson(),offset = log(covid$POPESTIMATE2020))
+summary(pomodel2)
+summary(pomodel1)
+```
+
+The deviance shows that it make sense to include an offset. The population of the counties is the best offset because the case count varies a lot because of the different size of the counties.In the model I use the popestimate2020 as the offset.
+
+## (e)
+
+```{r}
+summary(pomodel2)
+cat("\nThe difference between the Residual Deviance and Null Deviance:\n")
+pomodel2$null.deviance-pomodel2$deviance
+cat("\nThe chi-squared statistic value:\n")
+qchisq(.95,3131-3098)
+cat("\nThe p-value:\n")
+1-pchisq(pomodel2$null.deviance-pomodel2$deviance,33)
+```
+According to the results we find that the residual deviance and the difference between null and redeced model's deviance are also large which means lack of fit. But it's much better than the first model.
+
+We can reject H0 the null model and choose H1 the reduced model because 203572 >> 47.4
+
+## (f)
+
+```{r}
+cat("\nThe exp(beta of percent poverty):\n")
+options(digits=7)
+exp(pomodel2$coefficients[13])
+cat("\nIt means a one-unit increase in the predictor has a multiplicative impact of 0.9996 on μ:\n")
+cat("\nThe Wald statistics:\n")
+pomodel2$coefficients[13]/summary(pomodel2)$coefficients[13,2]
+cat("\nThe z-score for 95% confience level:\n")
+qnorm(.05/2,lower.tail=FALSE)
+```
+0.708 < 1.96 so the beta is not statistically significant at 95% confidence level
+
+## (g)
+
+```{r}
+cat("\nFrom The results above show that the offset variable will influence the analysis.\n")
+summary(covid$POPESTIMATE2020)
+var(covid$POPESTIMATE2020)
+```
+From the statistics of population, this variable has a very large variance like y so it will influence the results as an offset
+
+## (h)
+
+```{r}
+library(MASS)
+pomodel3 = glm.nb(y~.+offset(log(covid$POPESTIMATE2020)),data = covid_simple)
+summary(pomodel3)
+cat("\n We compare the saturated model with the fitted model\n")
+cat("\nThe chi-squared statistic value:\n")
+qchisq(0.95,3098)
+cat("\nThe p-value:\n")
+1-pchisq(pomodel3$deviance,3098)
+cat("\nWe can reject H0 the fitted model.\n")
+cat("\nThe difference between the Residual Deviance and Null Deviance:\n")
+pomodel3$null.deviance-pomodel3$deviance
+cat("\nThe chi-squared statistic value:\n")
+qchisq(.95,3131-3098)
+cat("\nThe p-value:\n")
+1-pchisq(pomodel3$null.deviance-pomodel3$deviance,33)
+```
+According to the results we find that the residual deviance and the difference between null and redeced model's deviance are very large which means lack of fit.
+
+We can reject H0 the null model and choose H1 the reduced model because 1614 > 47.4
+
+## (i)
+
+```{r}
+cat("\nThe dispersion parameter is γ=1/θ. Var(y)=μ+γμ^2.\nWhen the γ->0,the NB distribution ->poisson. When it increases, the overdispersion increases.\n")
+cat("\nγ:\n")
+1/summary(pomodel3)$theta
+cat("\nThe γ>0 shows the overdispersion.\n")
+```
+
+## (j)
+
+```{r}
+cat("H0:Poisson(γ=0). H1:NB(γ>0)")
+cat("\nThe loglikelyhood of the models:\n")
+logLik(pomodel2)
+logLik(pomodel3)
+cat("Difference of the deviance:")
+-2*(logLik(pomodel2)-logLik(pomodel3))[1]
+cat("\nThe chi-squared statistics:\n")
+qchisq(0.95,1)
+cat("\nThe p-value:\n")
+1-pchisq(-2*(logLik(pomodel2)-logLik(pomodel3))[1], df = 1)
+```
+So we can reject H0 and choose NB regression model.
+
+## (k)
+
+```{r}
+cat("\nThe exp(beta of percent no insurance):\n")
+exp(pomodel3$coefficients[16])
+cat("\nIt means a one-unit increase in the predictor has a multiplicative impact of 1.003 on μ:\n")
+cat("\nThe Wald statistics:\n")
+pomodel3$coefficients[16]/summary(pomodel3)$coefficients[16,2]
+cat("\nThe z-score for 95% confience level:\n")
+qnorm(.05/2,lower.tail=FALSE)
+```
+0.801 < 1.96 so the beta is not statistically significant at 95% confidence level
+
+## (l)
+
+```{r}
+cat("\nThe exp(beta of percent no insurance) in poisson regression:\n")
+exp(pomodel2$coefficients[16])
+cat("\nIt means a one-unit increase in the predictor has a multiplicative impact of 1.013 on μ:\n")
+cat("\nThe Wald statistics:\n")
+pomodel2$coefficients[16]/summary(pomodel2)$coefficients[16,2]
+cat("\nThe z-score for 95% confience level:\n")
+qnorm(.05/2,lower.tail=FALSE)
+```
+28.91 > 1.96 so the beta is statistically significant at 95% confidence level in possion regression.
+
+The difference may because  poisson regression cannot evaluate the dispersion separately and the coefficients will be more significant.
+
+## (m)
+
+```{r}
+pomodel4 = glm.nb(y~.,data = covid_simple)
+aic = data.frame(model=c("NBOFF","NB","POIOFF","POI"),aic=c(summary(pomodel3)$aic,summary(pomodel4)$aic,summary(pomodel2)$aic,summary(pomodel1)$aic))
+aic
+```
+According to the result I choose the NB regression with offset.
+
+
+# Q2
+
+## (a)
+
+```{r}
+covid2 = data.frame(read.csv("covid_data_pdb_3.csv"))
+wekount = data.frame(x=c(1:3132),week1 = c(covid2[covid2$week==1,]$count),week2 = c(covid2[covid2$week==2,]$count),week3 = c(covid2[covid2$week==3,]$count))
+cor(wekount[,c("week1","week2","week3")])
+cat("\nThe results show that the three 7-day counts have positive correlation.\n")
+```
+
+## (b)
+
+```{r}
+library(gee)
+summary(covid2)
+fit.gee.unstr = gee(count~pct_URBANIZED_AREA_POP_CEN_2010+pct_Prs_Blw_Pov_Lev_ACS_14_18+pct_No_Health_Ins_ACS_14_18+offset(log(Tot_Population_ACS_14_18)), id = GIDSTCO,
+family=poisson, corstr="unstructured", scale.fix=T, data=covid2)
+fit.gee.unstr$working.correlation
+```
+The working correlation matrix indicates that the correlation between the three 7-day counts within a county is unstructured. Because we specified an unstructured correlation structure. This estimated correlations more than 0.5 so the structure is reasonable.
+
+## (c)
+
+```{r}
+fit.gee.exch = gee(count~pct_URBANIZED_AREA_POP_CEN_2010+pct_Prs_Blw_Pov_Lev_ACS_14_18+pct_No_Health_Ins_ACS_14_18+offset(log(Tot_Population_ACS_14_18)), id = GIDSTCO,
+family=poisson, corstr="exchangeable", scale.fix=T, data=covid2)
+fit.gee.exch$working.correlation
+```
+The working correlation matrix indicates that the correlation between the three 7-day counts within a county is
+estimated to be 0.646. Because we specified an exchangeable correlation structure, this correlation is the same for all pairs in a group.
+
+Compared with the unstructured correlation, I will choose the unstructured because it shows the differences between different groups.
+
+## (d)
+
+```{r}
+cat("\nunstructured z\n")
+summary(fit.gee.unstr)$coefficients[,c(3,5)]
+cat("\nexchangeable z\n")
+summary(fit.gee.exch)$coefficients[,c(3,5)]
+```
+The naive and robust z in the two structure are similar for each predictor. It may because the correlation in different pairs of the 3 counts are similar.
+
+## (e)
+
+```{r}
+exp(fit.gee.unstr$coefficients[3])
+cat("\nIt means a one-unit increase in the predictor has a multiplicative impact of 1.006 on μ\n")
+cat("\nWe use the robust se to get the Wald statistics:\n")
+fit.gee.unstr$coefficients[3]/summary(fit.gee.unstr)$coefficients[3,4]
+cat("\nThe z-score for 95% confience level:\n")
+qnorm(.05/2,lower.tail=FALSE)
+cat("\n 0.272 < 1.96 so the beta is not statistically significant at 95% confidence level\n")
+```
+
+## (f)
+
+```{r}
+fit.glm = glm(count~pct_URBANIZED_AREA_POP_CEN_2010+pct_Prs_Blw_Pov_Lev_ACS_14_18+pct_No_Health_Ins_ACS_14_18+offset(log(Tot_Population_ACS_14_18)), family=poisson, data=covid2)
+zval = data.frame(glm_z=c(summary(fit.glm)$coefficients[,3]),gee_rob_z= c(summary(fit.gee.unstr)$coefficients[,5]))
+zval
+```
+
+We can see that in the glm model, all the predictors are statistically significant. But in the GEE model the percent of poverty is not significant. I would choose the GEE model
+
+## (g)
+
+```{r}
+library(lme4)
+fit.glmm = glmer(count~pct_URBANIZED_AREA_POP_CEN_2010+pct_Prs_Blw_Pov_Lev_ACS_14_18+pct_No_Health_Ins_ACS_14_18+ (1|GIDSTCO)+offset(log(Tot_Population_ACS_14_18)), family=poisson, data=covid2)
+summary(fit.glmm)
+```
+
+The results for the random effects indicate that the estimate of the variance for the random intercept is = 0.532, ui~N(0,0.532), there is a cluster effect in this data.
+
+## (h)
+
+```{r}
+exp(summary(fit.glmm)$coefficients[3,1])
+cat("\nIt means a one-unit increase in the predictor has a multiplicative impact of 1.12 on μ\n")
+cat("\nthe Wald statistics:\n")
+summary(fit.glmm)$coefficients[3,1]/summary(fit.glmm)$coefficients[3,2]
+cat("\nThe z-score for 95% confience level:\n")
+qnorm(.05/2,lower.tail=FALSE)
+```
+7.59 > 1.96 so the beta is not statistically significant at 95% confidence level
+
+It is different from the result of (e), in the gee model the predictor is not significant. 
+
+## (i)
+
+```{r}
+cat("\nglm\n")
+summary(fit.glmm)$coefficients
+cat("\nglmm\n")
+summary(fit.glm)$coefficients
+zval2 = data.frame(glm_z=c(summary(fit.glm)$coefficients[,3]),glmm_z= c(summary(fit.glmm)$coefficients[,3]))
+zval2
+```
+
+From the results, the coefficients are similar,the predictors are all significant in both of the models. The SE in the glmm model is much bigger than that in the glm model.
+
+## (j)
+
+```{r}
+cat("H0:GLM model. H1:GLMM model")
+cat("\nThe loglikelyhood of the models:\n")
+logLik(fit.glm)
+logLik(fit.glmm)
+cat("Difference of the deviance:")
+-2*(logLik(fit.glm)-logLik(fit.glmm))[1]
+cat("\nThe chi-squared statistics:\n")
+qchisq(0.95,1)
+cat("\nThe p-value:\n")
+1-pchisq(-2*(logLik(fit.glm)-logLik(fit.glmm))[1], df = 1)
+cat("\nSo we can reject H0 and choose GLMM model.\n")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,129 @@
+---
+title: "6210HW3"
+author: "Qinyuan Xing"
+date: "2021/10/10"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, results = "markup", message = F)
+options(scientific=T, digits = 3) 
+```
+
+###  Q1
+
+```{r q1}
+covid = data.frame(read.csv("covid_data_pdb.csv"))
+covid$StateAbbr = as.factor(covid$StateAbbr)
+covid$State = as.factor(covid$State)
+covid$State_name = as.factor(covid$State_name)
+covid$division = as.factor(covid$division)
+covid$County = as.character(covid$County)
+covid$covid_case_rate = 100*covid$covid_count/covid$Tot_Population_ACS_14_18
+covid_simple = covid[,c(10,159,163,167,169,171,173,175,177,179,182,186,196,197,211,212,214,217,219,228,230,232,260,265,269,271,274,282,285,287,289,290)]
+str(covid_simple)
+levels(covid_simple$division)
+lmod1 = lm(covid_case_rate~.,covid_simple)
+plot(lmod1,1)
+cat("\nThe plot shows that the response and indicators have linear relation.\nBesides, it shows that the variance of the errors is constant for the shape is not like a funnel\n")
+plot(lmod1,2)
+cat("\nThe Q-Q plot shows the normality of the errors\n")
+cat("\nThe plots show that the 72,256,411 are the outliers\n")
+plot(lmod1,5)
+cat("\nThe plot shows that 72 is an influential point\n")
+car::vif(lmod1)
+cat("The VIFs show that there are some predictors with collinearity")
+summary(lmod1)
+cat("\nThe summary shows that the model's R^2 is not so good. There are some predictors are not significant.\n")
+cat("\nHere are the confidence intervals of the coefficients with 95% level\n")
+confint(lmod1,level = 0.95)
+covid_new = covid_simple[-c(72,256,411),]
+lmod2 = lm(covid_case_rate~LAND_AREA+pct_URBANIZED_AREA_POP_CEN_2010+pct_Inst_GQ_CEN_2010+pct_NH_Blk_alone_ACS_14_18+pct_College_ACS_14_18+pct_Civ_unemp_16p_ACS_14_18+pct_Vacant_Units_ACS_14_18+pct_Single_Unit_ACS_14_18+avg_Agg_House_Value_ACS_14_18+pct_HHD_No_Internet_ACS_14_18+division,covid_new)
+summary(lmod2)
+car::vif(lmod2)
+cat("\nI delete some predictors to build model2,The R^2 of the new model is still low, but it is better than before and  there is no collinearity problem.\n")
+```
+
+**Now we use feature selection method to get a new model from model1**
+
+```{r}
+library(MASS)
+lmod3 = lm(covid_case_rate~.,covid_new)
+step(lmod3,direction = "both")
+lmod4 = lm(formula = covid_case_rate ~ LAND_AREA + pct_URBANIZED_AREA_POP_CEN_2010 + 
+    pct_Males_ACS_14_18 + pct_Pop_under_5_ACS_14_18 + pct_Pop_5_17_ACS_14_18 + 
+    pct_Pop_18_24_ACS_14_18 + pct_Pop_25_44_ACS_14_18 + pct_Pop_65plus_ACS_14_18 + 
+    pct_Inst_GQ_CEN_2010 + pct_NH_Blk_alone_ACS_14_18 + pct_College_ACS_14_18 + 
+    pct_No_Health_Ins_ACS_14_18 + pct_Diff_HU_1yr_Ago_ACS_14_18 + 
+    pct_Born_foreign_ACS_14_18 + pct_NON_US_Cit_ACS_14_18 + avg_Agg_HH_INC_ACS_14_18 + 
+    pct_Vacant_Units_ACS_14_18 + pct_Single_Unit_ACS_14_18 + 
+    avg_Agg_House_Value_ACS_14_18 + pct_HHD_w_Computer_ACS_14_18 + 
+    pct_HHD_No_Internet_ACS_14_18 + division, data = covid_new)
+summary(lmod4)
+cat("\nThe new model from backward step feature selection is better than the former one.\n")
+
+```
+
+**From the last model we can see that all the predictors are significant in some way. As I said in the last homework, the education levels and the income levels and related factors like house value and Internet are strongly related to the covid case rate.**
+
+###  Q2
+
+```{r q2}
+cat("\n(a)\n")
+Wage = data.frame(read.csv("Wage.csv"))
+wlmod1 = lm(wage~year+age,Wage)
+sum = summary(wlmod1)
+sum
+cat("\n")
+```
+**The form is wage = a*year + b*age + c. The assumption is the residuals ~ N(0,sigma^2),then the wage ~ N(a*year+b*age+c,sigma^2). **
+```{r}
+cat("\n(b)\n")
+wglmod = glm(wage ~ year+age,family = gaussian(link = "identity"),data = Wage)
+summary(wglmod)
+```
+
+**The form is E(wage) = a*year + b*age + c. The assumption is the wage follow normal distribution. **
+
+```{r}
+cat("\n(c)\n")
+sum
+gsum = summary(wlmod1)
+gsum
+sum$coefficients == gsum$coefficients
+```
+**The two models are same because in the first lm model, we assume residuals ~ N(0,sigma^2), then the wage ~ N(a*year+b*age+c,sigma^2). It is same with our assumption in glm model E(wage) = a*year+b*age+c, wage ~ N(a*year+b*age+c,sigma^2)**
+```{r}
+cat("\n(d)\n")
+wlmod2 = lm(log(wage)~year+age,Wage)
+sum2 = summary(wlmod2)
+sum2
+```
+
+**The form is log(wage) = a*year + b*age + c. The assumption is the residuals ~ N(0,sigma^2),then the log(wage) ~ N(a*year+b*age+c,sigma^2). **
+
+```{r}
+cat("\n(e)\n")
+wglmod2 = glm(wage ~ year+age,family = gaussian(link = "log"),data = Wage)
+gsum2 = summary(wglmod2)
+gsum2
+```
+**The form is log(E(wage)) = a*year + b*age + c. The assumption is the wage follow normal distribution.** 
+
+
+**(f) From the summary above the two model are different because for the lm model log(wage) ~ N(a*year+b*age+c,sigma^2). But for the glm model, wage ~ N(exp(a*year+b*age+c),sigma^2).**
+
+
+
+
+
+
